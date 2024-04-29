@@ -3,6 +3,7 @@ library(shinyWidgets)
 library(caret)
 library(ggplot2)
 library(DT)
+library(shinyalert)
 
 # Define UI for data upload app ----
 ui <- fluidPage(# App title ----
@@ -49,6 +50,21 @@ ui <- fluidPage(# App title ----
                                 selected = "onehot"),
                     
                     actionButton("process_data", "Process Data"),
+                    tags$hr(),
+                    
+                    # Input: Select the type of feature scaling
+                    radioButtons("scaling_type", "Choose Scaling Type:",
+                                 choices = list("Standardization (Z-score)" = "standard",
+                                                "Normalization (Min-Max)" = "normalize"),
+                                 selected = "standard"),
+                    
+                    actionButton("scale_data", "Scale Data"),
+                    
+                    # Slider input for specifying the size of the training set
+                    sliderInput("trainSize", "Percentage of the dataset to use as the training set:",
+                                min = 0.1, max = 0.9, value = 0.7, step = 0.01),
+                    
+                    actionButton("split_data", "Split Data"),
                     
                     # Horizontal line ----
                     tags$hr(),
@@ -87,10 +103,12 @@ ui <- fluidPage(# App title ----
                       
                     ),
                     tabPanel("Data Preprocessing",
-                             h4("Datatable after Missing Value"),
                              DT::dataTableOutput("processed_data"),
-                             h4("Datatable after Encoder"),
-                             DT::dataTableOutput("encoded_data"),
+                             h4("Scale Feature"),
+                             verbatimTextOutput("summaryScaled"),
+                             h4("Splitting the dataset into Test set and Train set"),
+                             verbatimTextOutput("summaryTrain"),
+                             verbatimTextOutput("summaryTest")
                              )
                   ))
                 ))

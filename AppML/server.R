@@ -46,6 +46,7 @@ function(input, output, session) {
                 options = list(`style` = "btn-info"),
                 multiple = TRUE) # Allow multiple selection
   })
+  
   output$cat_vars_select <- renderUI({
     req(data())
     df <- data()
@@ -70,6 +71,7 @@ function(input, output, session) {
       df <- na.omit(df)
     } else {
       targetVar <- input$selected_vars
+      if (all(sapply(df[targetVar], is.numeric))) {
       naReplaceValue <- if (input$na_handling == "mean") {
         sapply(df[targetVar], function(x) mean(x, na.rm = TRUE))
       } else if (input$na_handling == "median") {
@@ -83,6 +85,15 @@ function(input, output, session) {
       
       for (var in targetVar) {
         df[[var]][is.na(df[[var]])] <- naReplaceValue[var]
+      }
+      }else{
+        # Categorical variables: Replace with the most frequent value
+        for (var in targetVar) {
+          if (is.character(df[[var]])) {
+            modeValue <- names(sort(table(df[[var]]), decreasing = TRUE))[1]
+            df[[var]][is.na(df[[var]])] <- modeValue
+          }
+        }
       }
     }
     
@@ -102,6 +113,7 @@ function(input, output, session) {
     # Add other encoding methods here if needed
     
     df # Return the processed data frame
+  
   })
   
   # Output: Display processed data
@@ -110,7 +122,62 @@ function(input, output, session) {
     processedData()
   }, options = list(pageLength = 10))
 
-
+  # Server logic to scale the data based on user input
+  observeEvent(input$scale_data, {
+    req(data())
+    df <- data() # Get the data frame
+    
+    # Apply the chosen scaling method
+    if (input$scaling_type == "standard") {
+      # Standardization (Z-score)
+      numeric_columns <- sapply(df, is.numeric)
+      # Apply standardization only to numeric columns
+      df[numeric_columns] <- scale(df[numeric_columns])
+    } else if (input$scaling_type == "normalize") {
+      # Normalization (Min-Max)
+      min_max_normalize <- function(x) {
+        (x - min(x, na.rm = TRUE)) / (max(x, na.rm = TRUE) - min(x, na.rm = TRUE))
+      }
+      df <- as.data.frame(lapply(df, min_max_normalize))
+    }
+    
+    # Save the scaled data into a reactiveValues object
+    values <- reactiveValues(scaledData = df)
+    
+    # Output: Display the summary of scaled data
+    output$summaryScaled <- renderPrint({
+      req(values$scaledData)
+      summary(values$scaledData)
+    })
+  })
+  
+  # Server logic to split the data based on user input
+  observeEvent(input$split_data, {
+    req(data())
+    df <- data() # Get the data frame
+    
+    # Calculate the size of the training set
+    trainIndex <- floor(input$trainSize * nrow(df))
+    
+    # Split the data into training and test sets
+    set.seed(123) # For reproducibility
+    trainData <- df[1:trainIndex, ]
+    testData <- df[(trainIndex + 1):nrow(df), ]
+    
+    # Save the split datasets into reactive values
+    values <- reactiveValues(trainSet = trainData, testSet = testData)
+    
+    # Output: Display the summary of training and test sets
+    output$summaryTrain <- renderPrint({
+      req(values$trainSet)
+      summary(values$trainSet)
+    })
+    
+    output$summaryTest <- renderPrint({
+      req(values$testSet)
+      summary(values$testSet)
+    })
+  })
   output$tableDataset <-  DT::renderDataTable({
     data()
   })
